@@ -1,0 +1,387 @@
+
+			   Graphql Implemenation
+....................................................................................
+GraphQL Application Dev
+.....................................................................................
+
+Graphql application can be developmed using 
+
+1.Monoloithic style-  standalone app
+2.Microservice style - Federation
+
+
+
+Work Flow
+1.SDL must be there and must be very clear.
+
+GraphQL Application can be written in any language
+
+
+Javascript:
+
+1.graphql.js
+   =>core framework written by facebook
+   =>Express.js is underlaying framework
+
+2.Apollo
+    Apollo is platform for building enterprise graphql application.
+    The core of Apollo is "graphql.js and Express.js"
+ Graphql application can be built using two arch
+ 1.monolith arch
+ 2.Microservices arch.
+
+Java:
+1.graphql-java
+2.SpringBoot with Graphql
+3.DGS Framework - Netflix
+
+Coding style:
+
+1.schema first design
+   design schema first and code
+2.code first design
+   code first , then generate schema out of code
+
+some development framworks support schema first some one support code first,some one first both.
+
+DGS framwork support schema first design.
+
+Getting Started:
+
+create project with dependencies
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'com.netflix.graphql.dgs:graphql-dgs-spring-graphql-starter'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+
+Schema design:
+...............
+
+resources/schema/schema.graphqls
+
+type Query {
+    #nameofApi:Data
+    hello:String
+}
+
+Implementation:
+
+Data Features:
+ Class having schema implemenation.
+
+1.Receive incoming graphql query from client
+2.validate that query against our schema
+3.retrive the data from the quried schema fields
+4.return the data as a response
+
+Writing Data Fetcher
+
+Step 1: Declare class com.wipro/datafetchers
+
+package com.wipro.datafetchers;
+
+public class HelloWorldDataFetcher {
+}
+
+Ste 2: Understand about How to map Schema with Java class.
+
+Annotations:
+1.@DgsComponent
+2.@DgsQuery
+3.@DgsMutation
+4.@DgsSubscription
+5.@DgsData
+
+package com.wipro.datafetchers;
+
+import com.netflix.graphql.dgs.DgsComponent;
+
+@DgsComponent
+public class HelloWorldDataFetcher {
+}
+
+Step 3:Write Resolver, wirte biz logic for query api
+
+package com.wipro.datafetchers;
+
+import com.netflix.graphql.dgs.DgsComponent;
+import com.netflix.graphql.dgs.DgsQuery;
+
+@DgsComponent
+public class HelloWorldDataFetcher {
+
+    @DgsQuery
+    public String hello(){
+        return  "Hello";
+    }
+}
+
+Test:
+http://localhost:8080/graphiql?path=/graphql
+
+query MyQuery {
+  hello
+}
+
+Response:
+{
+  "data": {
+    "hello": "Hello"
+  }
+}
+.................................................................................
+			 What if Schema fieldName and method name is different
+...................................................................................
+package com.wipro.datafetchers;
+
+import com.netflix.graphql.dgs.DgsComponent;
+import com.netflix.graphql.dgs.DgsQuery;
+
+@DgsComponent
+public class HelloWorldDataFetcher {
+
+    @DgsQuery(field = "hello")
+    public String sayHello(){
+        return  "Hello";
+    }
+}
+...................................................................................
+			How to handle Not Null
+..................................................................................
+
+schema.graphqls
+type Query {
+    #nameofApi:Data
+    hello:String
+    hai:String!
+}
+
+
+package com.wipro.datafetchers;
+
+import com.netflix.graphql.dgs.DgsComponent;
+import com.netflix.graphql.dgs.DgsQuery;
+
+@DgsComponent
+public class HelloWorldDataFetcher {
+
+    @DgsQuery(field = "hello")
+    public String sayHello(){
+        return  "Hello";
+    }
+    @DgsQuery(field = "hai")
+    public String sayHai(){
+        return  null;
+    }
+}
+
+Testing:
+query MyQuery {
+  hai
+}
+Response:
+{
+  "errors": [
+    {
+      "message": "The field at path '/hai' was declared as a non null type, but the code involved in retrieving data has wrongly returned a null value.  The graphql specification requires that the parent field be set to null, or if that is non nullable that it bubble up null to its parent and so on. The non-nullable type is 'String' within parent type 'Query'",
+      "path": [
+        "hai"
+      ],
+      "extensions": {
+        "classification": "NullValueInNonNullableField",
+        "errorType": "BAD_REQUEST"
+      }
+    }
+  ],
+  "data": null
+}
+....................................................................................
+			 Parameters and args
+....................................................................................
+package com.wipro.datafetchers;
+
+import com.netflix.graphql.dgs.DgsComponent;
+import com.netflix.graphql.dgs.DgsQuery;
+import com.netflix.graphql.dgs.InputArgument;
+
+@DgsComponent
+public class HelloWorldDataFetcher {
+
+    @DgsQuery(field = "hello")
+    public String sayHello() {
+        return "Hello";
+    }
+
+    @DgsQuery(field = "hai")
+    public String sayHai() {
+        return null;
+    }
+
+    @DgsQuery(field = "name")
+    public String getName(@InputArgument String input) {
+        return input.toUpperCase();
+    }
+}
+
+Testing:
+query MyQuery {
+  name(input:"Subramaian")
+}
+
+{
+  "data": {
+    "name": "SUBRAMAIAN"
+  }
+}
+
+Variables:
+
+query MyQuery($input:String) {
+  name(input:$input)
+}
+
+{
+  "input":"ram"
+}
+..................................................................................
+			Complex Type,Collections
+...................................................................................
+
+GraphQL Comments(For documentation)
+
+"" Single Comment ""
+
+"""
+ Multi line
+ Multi line
+"""
+
+Data sources:
+.............
+
+1.REST API As Datasources
+2.Database As Datasources
+
+
+1.REST API as Datasources
+.........................
+ Travel Booking
+    intergalatic
+
+Listing: features offered 
+
+Stage: 1 Basic schema and Data fetcher
+
+type Query{
+    "A array of listings to feature on the home of the user application"
+    featuredListings:[Listing!]!
+}
+
+"A Particular intergalatic location available for booking"
+type Listing {
+    id:ID!
+    "listing tile"
+    title:String!
+    "The number of bed available"
+    numOfBeds:Int
+    "The cost per night"
+    costPerNight:Float
+    "Indicates whether listing is closed for books"
+    closedForBookings:Boolean
+}
+
+codegen:
+ A feature provided by DGS framework, to generated "Model" classes out of schema types.
+
+codegen feature is available directly inside "gradle build" , suppose if your project is based on maven, also available but dgs team is not giving, thrid party plugin.
+
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.2.5'
+	id 'io.spring.dependency-management' version '1.1.4'
+	id 'com.netflix.dgs.codegen' version '6.0.3'
+}
+
+Just run now the app...
+
+./gradlew bootRun or run main program
+
+
+After generating, we need to create model class
+
+package com.example.listings.models;
+
+import com.example.listings.generated.types.Listing;
+
+public class ListingModel extends Listing {
+
+}
+
+Data fetcher with mock data:
+...........................
+package com.example.listings.datafetchers;
+
+import com.example.listings.models.ListingModel;
+import com.netflix.graphql.dgs.DgsComponent;
+import com.netflix.graphql.dgs.DgsQuery;
+
+import java.util.List;
+
+@DgsComponent
+public class ListingDataFetcher {
+
+    @DgsQuery
+    public List<ListingModel> featuredListings(){
+        //specific featuredlisting logic goes here
+         //array of Listing
+        ListingModel listingModel1= new ListingModel();
+        listingModel1.setId("1");
+        listingModel1.setTitle("Beach House on the edge Ocean");
+        listingModel1.setCostPerNight(500.99);
+        listingModel1.setNumOfBeds(4);
+
+        ListingModel listingModel2= new ListingModel();
+        listingModel2.setId("2");
+        listingModel2.setTitle("Beautiful garden, green atmosphere");
+        listingModel2.setCostPerNight(500.99);
+        listingModel2.setNumOfBeds(4);
+        return  List.of(listingModel1,listingModel2);
+    }
+}
+
+Testing:
+query GetFeaturedListing {
+  featuredListings {
+    id
+    title
+  }
+}
+Response:
+{
+  "data": {
+    "featuredListings": [
+      {
+        "id": "1",
+        "title": "Beach House on the edge Ocean"
+      },
+      {
+        "id": "2",
+        "title": "Beautiful garden, green atmosphere"
+      }
+    ]
+  }
+}
+
+
+
+
+
+
+
+
+
+

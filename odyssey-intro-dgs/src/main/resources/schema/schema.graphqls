@@ -1,0 +1,17 @@
+type Query{
+    "A array of listings to feature on the home of the user application"
+    featuredListings:[Listing!]!
+}
+
+"A Particular intergalatic location available for booking"
+type Listing {
+    id:ID!
+    "listing tile"
+    title:String!
+    "The number of bed available"
+    numOfBeds:Int
+    "The cost per night"
+    costPerNight:Float
+    "Indicates whether listing is closed for books"
+    closedForBookings:Boolean
+}

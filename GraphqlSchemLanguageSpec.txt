@@ -1,0 +1,258 @@
+
+
+For every project there is a schema file
+
+schema.graphql
+..............
+
+//type declaration
+type Schema{
+  query:Query
+  mutation:Mutation
+  subscription:Subscription
+}
+
+class Employee {
+   data + operation
+
+  String greet(){}
+  User user(int id){}
+  User createUser(){
+}
+}
+
+type Query {
+  #apis
+  greet:String
+}
+
+type Mutation { 
+ #apis
+}
+
+type Subscription{
+ #apis
+}
+
+
+Server side
+
+type Mutation { 
+ #apis
+ createUser(user:User):User
+}
+
+ClientSide:
+
+mutation CreateUser($user:User){
+  
+   createUser(user:$user){
+     id
+     name
+   }
+}
+SDL Defines schema language and platform independant data types:
+.............................................................
+1.Scallar types
+2.Custom Types/ReferenceTypes/Object Types
+
+
+1.Scallar Types:
+  Scallars are like primitive types in your language
+
+1.Int -32 bit signed integer
+2.String - UTF-8 char Sequence
+3.Boolean - true or false
+4.Float - singed double 
+5.ID (Serialized String)- A unique identifier
+
+2.Object Type/Complex/User Defined/Reference Type
+ Similar to classes in object oriented languages- like java,C#
+
+
+type User{
+  id:ID
+  firstName:String
+  lastName:String
+  age:Int
+  points:Float
+  status:Boolean  
+}
+type Address {
+  city:String
+  state:String
+  zipcode:String
+}
+
+type Query{ 
+  user:User
+}
+
+Client side
+query getUser{
+  user {
+   id
+   firstName
+   address {
+     city
+   } 
+  }
+}
+....................................................................................
+			  Handling null and not null values
+...................................................................................
+
+Client Query With data
+{
+  name  --------> response {name:"subramanian"}
+}
+
+Client Query Without data
+{
+  name  --------> response {name:null}
+}
+
+I dont want null value for a given field? How to force the field must have data or must not have null?
+
+ => not null fields
+
+syntax:
+ fieldName:Type!
+!(not null)
+
+type Address {
+  city:String
+  state:String
+  zipcode:String
+}
+
+type User{
+  id:ID!
+  firstName:String!
+  lastName:String
+  age:Int
+  points:Float
+  status:Boolean 
+  address:Address
+}
+...................................................................................
+			  Collection - List of Similar Values
+..................................................................................
+
+The field may have more values
+
+ fieldName:[DataType]
+
+  DataType here can be Scalar or Object type
+ eg:
+ fieldName:[String] | [Int] [Float]
+ fieldName:[Address] [Order] [Items]
+...................................................................................
+			    Advanced Types
+
+=>Mutation 
+=>Subscription
+=>Input
+=>Enum
+=>Union
+=>Interface
+
+Mutation:
+  The Mutation is similar in Strcuture and purpose to the Query Type.
+
+Where as Query is read only operations, where as "Mutation" is entry points for "Write and Read" operations
+
+Signature of the Mutation:
+.........................
+
+type Mutation {
+   createUser(id:ID,firstName:String,lastName:String,age:Int):User 
+   updateUser(id:ID,user:User):User
+   removeUser(id:ID):User
+}
+...................................................................................
+			....................................................................................
+			  Input Types
+...................................................................................
+
+Input types are special Object types that allow you to provide hierarchical data as arguments to fields( as apposed to providing only flat scalar arguments)
+
+type Mutation {
+   #Flat scalar arguments
+   createUser(id:ID,firstName:String,lastName:String,age:Int):User 
+}
+
+type Address {
+  city:String!
+  state:String!
+  zipcode:String
+}
+
+
+type User{
+  id:ID!
+  firstName:String!
+  lastName:String
+  age:Int
+  points:Float
+  status:Boolean 
+  address:[Address!]!
+}
+
+input UserInput { 
+  id:ID!
+  firstName:String!
+  lastName:String
+  age:Int
+  points:Float
+  status:Boolean 
+  address:[Address!]!
+}
+
+Mutation without inputType
+type Mutation {
+   #Flat scalar arguments
+   createUser(id:ID,firstName:String,lastName:String,age:Int):User 
+}
+//Mutation with inputType
+type Mutation {
+   #Using Input Type
+   createUser(userInput:UserInput):User
+}
+....................................................................................
+....................................................................................
+				Enums
+....................................................................................
+
+An Enum is similar to scalar type, but its legal values are defined in the schema.
+
+enum Gender {
+ MALE
+ FEMALE
+ THIRD
+}
+How to use Enum?
+
+type Query {
+  gender:Gender
+}
+
+.....................................................................................
+			 Custom Scalar
+.....................................................................................
+GraphQL SDL provides basic core scalars - Int,String,Boolean,ID,Float.
+What if i want other data types like Date,Time
+
+
+How to define custom scalar
+
+scalar  Date
+
+type User {
+ dob:Date
+}
+
+Here Date is custom Scalar, but how this data type is represented /logic of this type is provided through "Server side code"
+.....................................................................................
+
+

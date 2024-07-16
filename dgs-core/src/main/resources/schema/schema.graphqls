@@ -1,0 +1,7 @@
+type Query {
+    #nameofApi:Data
+    hello:String
+    ""
+    hai:String!
+    name(input:String):String
+}
