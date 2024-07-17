@@ -375,13 +375,195 @@ Response:
     ]
   }
 }
+....................................................................................
+			 Data Source Integration
+....................................................................................
+
+REST AS Data source:
+....................
+
+Mock end Point:
+
+https://rt-airlock-services-listing.herokuapp.com/featured-listings
+
+Sample output
+
+[
+{
+id: "listing-1",
+title: "Cave campsite in snowy MoundiiX",
+description: "Enjoy this amazing cave campsite in snow MoundiiX, where you'll be one with the nature and wildlife in this wintery planet. All space survival amenities are available. We have complementary dehydrated wine upon your arrival. Check in between 34:00 and 72:00. The nearest village is 3AU away, so please plan accordingly. Recommended for extreme outdoor adventurers.",
+costPerNight: 120,
+hostId: "user-1",
+locationType: "CAMPSITE",
+numOfBeds: 2,
+photoThumbnail: "https://res.cloudinary.com/apollographql/image/upload/v1644350721/odyssey/federation-course2/illustrations/listings-01.png",
+isFeatured: true,
+latitude: 1023.4,
+longitude: -203.4,
+closedForBookings: false,
+amenities: [
+{
+id: "am-2"
+},
+{
+id: "am-10"
+},
+{
+id: "am-11"
+},
+{
+id: "am-12"
+},
+{
+id: "am-13"
+},
+{
+id: "am-26"
+},
+{
+id: "am-27"
+},
+{
+id: "am-16"
+},
+{
+id: "am-15"
+},
+{
+id: "am-14"
+},
+{
+id: "am-17"
+},
+{
+id: "am-18"
+},
+{
+id: "am-31"
+},
+{
+id: "am-20"
+},
+{
+id: "am-24"
+}
+]
+},
+]
+
+Task:
+
+1.Fetch featured-listing data from the rest api and map with graphql schema.
+
+2.We need to create service
 
 
+package com.example.listings.services;
+
+import com.example.listings.models.ListingModel;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+
+import java.io.IOException;
+import java.util.List;
+
+@Component
+public class ListingService {
+    private static final String LISTING_API_URL = "https://rt-airlock-services-listing.herokuapp.com";
+
+    private final RestClient client = RestClient.builder().baseUrl(LISTING_API_URL).build();
 
 
+    private final ObjectMapper mapper = new ObjectMapper();
+
+    //api
+    public List<ListingModel> featuredListingsRequest() throws IOException {
+        JsonNode response = client.get().uri("/featured-listings").retrieve().body(JsonNode.class);
+        if (response != null) {
+            return mapper.readValue(response.traverse(), new TypeReference<List<ListingModel>>() {
+            });
+        }
+        return null;
+    }
+
+}
 
 
+Inject service layer into data fetcher.
+
+package com.example.listings.datafetchers;
+
+import com.example.listings.models.ListingModel;
+import com.example.listings.services.ListingService;
+import com.netflix.graphql.dgs.DgsComponent;
+import com.netflix.graphql.dgs.DgsQuery;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import java.io.IOException;
+import java.util.List;
+
+@DgsComponent
+public class ListingDataFetcher {
+    
+    private final ListingService listingService;
+
+    @Autowired
+    public ListingDataFetcher(ListingService listingService) {
+        this.listingService = listingService;
+    }
+
+    @DgsQuery
+    public List<ListingModel> featuredListings() throws IOException {
+          return  listingService.featuredListingsRequest();
+    }
+}
 
 
+Restart server:
+query GetFeaturedListings {
+    featuredListings{
+      id
+      title
+      numOfBeds
+    }
+}
 
+Response:
+{
+  "errors": [
+    {
+      "message": "java.lang.reflect.UndeclaredThrowableException: null",
+      "locations": [],
+      "path": [
+        "featuredListings"
+      ],
+      "extensions": {
+        "errorType": "INTERNAL"
+      }
+    }
+  ],
+  "data": null
+}
+
+Why this Exception?
+  Because rest api provides many fields but our model or schema has only limited fileds
+
+Json mapper not able map all fileds.
+
+Solution:
+ Use @JsonIgnoreProperties(ignoreUnknown = true) annotation to skip unmatched properties against model class(Listing) 
+
+package com.example.listings.models;
+
+import com.example.listings.generated.types.Listing;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class ListingModel extends Listing {
+
+}
 
