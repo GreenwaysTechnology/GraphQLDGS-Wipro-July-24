@@ -1,6 +1,8 @@
 type Query{
     "A array of listings to feature on the home of the user application"
     featuredListings:[Listing!]!
+    "Returns the details about listing"
+    listing(id:ID!):Listing
 }
 
 "A Particular intergalatic location available for booking"
@@ -8,10 +10,21 @@ type Listing {
     id:ID!
     "listing tile"
     title:String!
+    "Listing Description"
+    description:String
     "The number of bed available"
     numOfBeds:Int
     "The cost per night"
     costPerNight:Float
     "Indicates whether listing is closed for books"
     closedForBookings:Boolean
+    "Amenities feature"
+    amenities: [Amenity!]!
+}
+type Amenity{
+    id:ID!
+    "The amenity category the amenity belongs to"
+    category:String!
+    "The amenity Name"
+    name:String!
 }

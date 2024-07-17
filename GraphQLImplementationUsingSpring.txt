@@ -566,4 +566,717 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 public class ListingModel extends Listing {
 
 }
+.....................................................................................
+			 Query Arguments
+....................................................................................
 
+https://rt-airlock-services-listing.herokuapp.com/listings/{listing_id}
+
+
+
+schema
+
+type Query{
+    "A array of listings to feature on the home of the user application"
+    featuredListings:[Listing!]!
+    "Returns the details about listing"
+    listing(id:ID!):Listing
+}
+
+Service:
+package com.example.listings.services;
+
+import com.example.listings.models.ListingModel;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+
+import java.io.IOException;
+import java.util.List;
+
+@Component
+public class ListingService {
+    private static final String LISTING_API_URL = "https://rt-airlock-services-listing.herokuapp.com";
+
+    private final RestClient client = RestClient.builder().baseUrl(LISTING_API_URL).build();
+
+
+    private final ObjectMapper mapper = new ObjectMapper();
+
+    //api
+    public List<ListingModel> featuredListingsRequest() throws IOException {
+        JsonNode response = client.get().uri("/featured-listings").retrieve().body(JsonNode.class);
+        if (response != null) {
+            return mapper.readValue(response.traverse(), new TypeReference<List<ListingModel>>() {
+            });
+        }
+        return null;
+    }
+
+    public ListingModel listingRequest(String id) {
+        return client.get()
+                .uri("/listings/{listing_id}", id)
+                .retrieve()
+                .body(ListingModel.class);
+    }
+
+}
+
+Datafetcher
+package com.example.listings.datafetchers;
+
+import com.example.listings.models.ListingModel;
+import com.example.listings.services.ListingService;
+import com.netflix.graphql.dgs.DgsComponent;
+import com.netflix.graphql.dgs.DgsQuery;
+import com.netflix.graphql.dgs.InputArgument;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import java.io.IOException;
+import java.util.List;
+
+@DgsComponent
+public class ListingDataFetcher {
+
+    private final ListingService listingService;
+
+    @Autowired
+    public ListingDataFetcher(ListingService listingService) {
+        this.listingService = listingService;
+    }
+
+    @DgsQuery
+    public List<ListingModel> featuredListings() throws IOException {
+          return  listingService.featuredListingsRequest();
+    }
+
+    @DgsQuery
+    public ListingModel listing(@InputArgument String id){
+         return  listingService.listingRequest(id);
+    }
+}
+
+Testing:
+
+
+
+query GetListing($listingId:ID!){
+   listing(id:$listingId){
+     id
+    title
+  }
+}
+
+Response:
+
+{
+  "data": {
+    "listing": {
+      "id": "listing-1",
+      "title": "Cave campsite in snowy MoundiiX"
+    }
+  }
+}
+.......................................................................
+				What if i am adding new field -requriement
+....................................................................................
+
+"A Particular intergalatic location available for booking"
+type Listing {
+    id:ID!
+    "listing tile"
+    title:String!
+    "Listing Description"
+    description:String
+    "The number of bed available"
+    numOfBeds:Int
+    "The cost per night"
+    costPerNight:Float
+    "Indicates whether listing is closed for books"
+    closedForBookings:Boolean
+}
+
+Just update the schema. Restart /rebuild app
+
+
+query GetListing($listingId:ID!){
+   listing(id:$listingId){
+     id
+    title
+    description
+  }
+}
+
+Response:
+
+{
+  "data": {
+    "listing": {
+      "id": "listing-1",
+      "title": "Cave campsite in snowy MoundiiX",
+      "description": "Enjoy this amazing cave campsite in snow MoundiiX, where you'll be one with the nature and wildlife in this wintery planet. All space survival amenities are available. We have complementary dehydrated wine upon your arrival. Check in between 34:00 and 72:00. The nearest village is 3AU away, so please plan accordingly. Recommended for extreme outdoor adventurers."
+    }
+  }
+}
+.....................................................................................
+				Nessted Field
+
+
+schema.graghql
+type Query{
+    "A array of listings to feature on the home of the user application"
+    featuredListings:[Listing!]!
+    "Returns the details about listing"
+    listing(id:ID!):Listing
+}
+
+"A Particular intergalatic location available for booking"
+type Listing {
+    id:ID!
+    "listing tile"
+    title:String!
+    "Listing Description"
+    description:String
+    "The number of bed available"
+    numOfBeds:Int
+    "The cost per night"
+    costPerNight:Float
+    "Indicates whether listing is closed for books"
+    closedForBookings:Boolean
+    "Amenities feature"
+    amenities: [Amenity!]!
+}
+type Amenity{
+    id:ID!
+    "The amenity category the amenity belongs to"
+    category:String!
+    "The amenity Name"
+    name:String!
+}
+
+Restart the sever
+
+You can get amenities details
+
+Testing:
+
+query GetListing($listingId:ID!){
+   listing(id:$listingId){
+     id
+    title
+    description
+    amenities {
+      id
+      name
+      category
+    }
+  }
+}
+
+Response:
+{
+  "data": {
+    "listing": {
+      "id": "listing-1",
+      "title": "Cave campsite in snowy MoundiiX",
+      "description": "Enjoy this amazing cave campsite in snow MoundiiX, where you'll be one with the nature and wildlife in this wintery planet. All space survival amenities are available. We have complementary dehydrated wine upon your arrival. Check in between 34:00 and 72:00. The nearest village is 3AU away, so please plan accordingly. Recommended for extreme outdoor adventurers.",
+      "amenities": [
+        {
+          "id": "am-2",
+          "name": "Towel",
+          "category": "Accommodation Details"
+        },
+        {
+          "id": "am-10",
+          "name": "Oxygen",
+          "category": "Space Survival"
+        },
+        {
+          "id": "am-11",
+          "name": "Prepackaged meals",
+          "category": "Space Survival"
+        },
+        {
+          "id": "am-12",
+          "name": "SOS button",
+          "category": "Space Survival"
+        },
+        {
+          "id": "am-13",
+          "name": "Meteor shower shield",
+          "category": "Space Survival"
+        },
+        {
+          "id": "am-26",
+          "name": "Meteor showers",
+          "category": "Outdoors"
+        },
+        {
+          "id": "am-27",
+          "name": "Wildlife",
+          "category": "Outdoors"
+        },
+        {
+          "id": "am-16",
+          "name": "Panic button",
+          "category": "Space Survival"
+        },
+        {
+          "id": "am-15",
+          "name": "Water recycler",
+          "category": "Space Survival"
+        },
+        {
+          "id": "am-14",
+          "name": "First-aid kit",
+          "category": "Space Survival"
+        },
+        {
+          "id": "am-17",
+          "name": "Emergency life support systems",
+          "category": "Space Survival"
+        },
+        {
+          "id": "am-18",
+          "name": "Universal translator",
+          "category": "Space Survival"
+        },
+        {
+          "id": "am-31",
+          "name": "Aquatic breathing aid",
+          "category": "Space Survival"
+        },
+        {
+          "id": "am-20",
+          "name": "Acid lake access",
+          "category": "Outdoors"
+        },
+        {
+          "id": "am-24",
+          "name": "Time travel paradoxes",
+          "category": "Outdoors"
+        }
+      ]
+    }
+  }
+}
+......................................................................................			  Featured Listings and Amenities
+.................................................................................
+
+https://rt-airlock-services-listing.herokuapp.com/featured-listings
+{
+id: "listing-1",
+title: "Cave campsite in snowy MoundiiX",
+description: "Enjoy this amazing cave campsite in snow MoundiiX, where you'll be one with the nature and wildlife in this wintery planet. All space survival amenities are available. We have complementary dehydrated wine upon your arrival. Check in between 34:00 and 72:00. The nearest village is 3AU away, so please plan accordingly. Recommended for extreme outdoor adventurers.",
+costPerNight: 120,
+hostId: "user-1",
+locationType: "CAMPSITE",
+numOfBeds: 2,
+photoThumbnail: "https://res.cloudinary.com/apollographql/image/upload/v1644350721/odyssey/federation-course2/illustrations/listings-01.png",
+isFeatured: true,
+latitude: 1023.4,
+longitude: -203.4,
+closedForBookings: false,
+amenities: [
+{
+id: "am-2"
+},
+{
+id: "am-10"
+},
+{
+id: "am-11"
+},
+{
+id: "am-12"
+},
+{
+id: "am-13"
+},
+{
+id: "am-26"
+},
+{
+id: "am-27"
+},
+{
+id: "am-16"
+},
+{
+id: "am-15"
+},
+{
+id: "am-14"
+},
+{
+id: "am-17"
+},
+{
+id: "am-18"
+},
+{
+id: "am-31"
+},
+{
+id: "am-20"
+},
+{
+id: "am-24"
+}
+]
+},
+
+Here you can notedown for this end point we have only amienties id, no other details
+
+just now we have updated our schema  like			
+
+"A Particular intergalatic location available for booking"
+type Listing {
+    id:ID!
+    "listing tile"
+    title:String!
+    "Listing Description"
+    description:String
+    "The number of bed available"
+    numOfBeds:Int
+    "The cost per night"
+    costPerNight:Float
+    "Indicates whether listing is closed for books"
+    closedForBookings:Boolean
+    "Amenities feature"
+    amenities: [Amenity!]!
+}
+type Amenity{
+    id:ID!
+    "The amenity category the amenity belongs to"
+    category:String!
+    "The amenity Name"
+    name:String!
+}
+
+Now lets test against featuredlisting for amenities
+
+query GetFeaturedListings {
+    featuredListings{
+      id
+      title
+      numOfBeds
+      costPerNight
+      closedForBookings
+      amenities {
+        id
+        category
+      }
+    }
+}
+
+Response:
+{
+  "errors": [
+    {
+      "message": "The field at path '/featuredListings[0]/amenities[0]/category' was declared as a non null type, but the code involved in retrieving data has wrongly returned a null value.  The graphql specification requires that the parent field be set to null, or if that is non nullable that it bubble up null to its parent and so on. The non-nullable type is 'String' within parent type 'Amenity'",
+      "path": [
+        "featuredListings",
+        0,
+        "amenities",
+        0,
+        "category"
+      ],
+      "extensions": {
+        "classification": "NullValueInNonNullableField"
+      }
+    },
+    {
+      "message": "The field at path '/featuredListings[0]/amenities[1]/category' was declared as a non null type, but the code involved in retrieving data has wrongly returned a null value.  The graphql specification requires that the parent field be set to null, or if that is non nullable that it bubble up null to its parent and so on. The non-nullable type is 'String' within parent type 'Amenity'",
+      "path": [
+        "featuredListings",
+        0,
+        "amenities",
+        1,
+        "category"
+      ],
+      "extensions": {
+        "classification": "NullValueInNonNullableField"
+      }
+    },
+
+Here rest api is not mapping amenities details directly. how to get featured listing with amenties data.
+              
+.....................................................................................
+			   Resolver Chain
+....................................................................................
+
+query GetListing($listingId:ID!){
+   listing(id:$listingId){
+    title
+  }
+}
+
+Here listing is called "Resolver (DataFetcher) (function/method)"
+
+what about title?
+   behind the scene "title"   is also relover/datafetcher(method)
+
+method call:
+     obj.something()
+   
+   Query.listing() ---->Listing--->Listing.title()
+ 
+...................................................................................
+			DgsDataFetchingEnviroment Object
+...................................................................................
+
+Object used to pass data or any information among data fetchers.
+
+Step: 
+ Create amenities Resolver and map with Lising
+
+package com.example.listings.datafetchers;
+
+import com.example.listings.models.ListingModel;
+import com.example.listings.services.ListingService;
+import com.netflix.graphql.dgs.DgsComponent;
+import com.netflix.graphql.dgs.DgsData;
+import com.netflix.graphql.dgs.DgsQuery;
+import com.netflix.graphql.dgs.InputArgument;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import java.io.IOException;
+import java.util.List;
+
+@DgsComponent
+public class ListingDataFetcher {
+
+    private final ListingService listingService;
+
+    @Autowired
+    public ListingDataFetcher(ListingService listingService) {
+        this.listingService = listingService;
+    }
+
+    @DgsQuery
+    public List<ListingModel> featuredListings() throws IOException {
+          return  listingService.featuredListingsRequest();
+    }
+
+    @DgsQuery
+    public ListingModel listing(@InputArgument String id){
+         return  listingService.listingRequest(id);
+    }
+
+    //This is data fecther: fetch amenities data from amenties end
+
+    @DgsData(parentType = "Listing")
+    public void amenities(){
+
+    }
+}
+
+Return Amenities Result via localContext
+.........................................
+
+package com.example.listings.datafetchers;
+
+import com.example.listings.generated.types.Amenity;
+import com.example.listings.models.ListingModel;
+import com.example.listings.services.ListingService;
+import com.netflix.graphql.dgs.*;
+import graphql.execution.DataFetcherResult;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+
+@DgsComponent
+public class ListingDataFetcher {
+
+    private final ListingService listingService;
+
+    @Autowired
+    public ListingDataFetcher(ListingService listingService) {
+        this.listingService = listingService;
+    }
+
+    @DgsQuery
+    public List<ListingModel> featuredListings() throws IOException {
+        return listingService.featuredListingsRequest();
+    }
+
+    @DgsQuery
+    public DataFetcherResult<ListingModel> listing(@InputArgument String id) {
+        // return  listingService.listingRequest(id);
+        ListingModel listing = listingService.listingRequest(id);
+        return DataFetcherResult.<ListingModel>newResult()
+                .data(listing)
+                .localContext(Map.of("hasAmenityData", true))
+                .build();
+    }
+
+    //This is data fecther: fetch amenities data from amenties end
+
+    @DgsData(parentType = "Listing")
+    public List<Amenity> amenities(DgsDataFetchingEnvironment dfe) {
+        ListingModel listing = dfe.getSource();
+        //getListing id
+        String id = listing.getId();
+        Map<String,Boolean> localContext = dfe.getLocalContext();
+        if(localContext.get("hasAmenityData")){
+             return listing.getAmenities();
+        }
+        //Follow up
+    }
+}
+
+..........
+
+updating service
+package com.example.listings.services;
+
+import com.example.listings.generated.types.Amenity;
+import com.example.listings.models.ListingModel;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+
+import java.io.IOException;
+import java.util.List;
+
+@Component
+public class ListingService {
+    private static final String LISTING_API_URL = "https://rt-airlock-services-listing.herokuapp.com";
+
+    private final RestClient client = RestClient.builder().baseUrl(LISTING_API_URL).build();
+
+
+    private final ObjectMapper mapper = new ObjectMapper();
+
+    //api
+    public List<ListingModel> featuredListingsRequest() throws IOException {
+        JsonNode response = client.get().uri("/featured-listings").retrieve().body(JsonNode.class);
+        if (response != null) {
+            return mapper.readValue(response.traverse(), new TypeReference<List<ListingModel>>() {
+            });
+        }
+        return null;
+    }
+
+    public ListingModel listingRequest(String id) {
+        return client.get()
+                .uri("/listings/{listing_id}", id)
+                .retrieve()
+                .body(ListingModel.class);
+    }
+
+    public List<Amenity> amenitiesRequest(String listingId) throws IOException {
+        //https://rt-airlock-services-listing.herokuapp.com/listings/listing-10/amenities
+        JsonNode response = client.get().uri("/listings/{listing_id}/amenities", listingId)
+                .retrieve()
+                .body(JsonNode.class);
+        if (response != null) {
+            return mapper.readValue(response.traverse(), new TypeReference<List<Amenity>>() {
+            });
+        }
+        return null;
+
+
+    }
+
+}
+
+
+Data fetcher
+
+package com.example.listings.datafetchers;
+
+import com.example.listings.generated.types.Amenity;
+import com.example.listings.models.ListingModel;
+import com.example.listings.services.ListingService;
+import com.netflix.graphql.dgs.*;
+import graphql.execution.DataFetcherResult;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+
+@DgsComponent
+public class ListingDataFetcher {
+
+    private final ListingService listingService;
+
+    @Autowired
+    public ListingDataFetcher(ListingService listingService) {
+        this.listingService = listingService;
+    }
+
+    @DgsQuery
+    public List<ListingModel> featuredListings() throws IOException {
+        return listingService.featuredListingsRequest();
+    }
+
+    @DgsQuery
+    public DataFetcherResult<ListingModel> listing(@InputArgument String id) {
+        // return  listingService.listingRequest(id);
+        ListingModel listing = listingService.listingRequest(id);
+        return DataFetcherResult.<ListingModel>newResult()
+                .data(listing)
+                .localContext(Map.of("hasAmenityData", true))
+                .build();
+    }
+
+    //This is data fecther: fetch amenities data from amenties end
+
+    @DgsData(parentType = "Listing")
+    public List<Amenity> amenities(DgsDataFetchingEnvironment dfe) throws IOException {
+        ListingModel listing = dfe.getSource();
+        //getListing id
+        String id = listing.getId();
+        Map<String, Boolean> localContext = dfe.getLocalContext();
+        if (localContext.get("hasAmenityData")) {
+            return listing.getAmenities();
+        }
+        //Follow up
+        return listingService.amenitiesRequest(id);
+
+    }
+}
+
+Testing
+
+https://rt-airlock-services-listing.herokuapp.com/featured-listings
+
+ here only amenity id
+
+
+https://rt-airlock-services-listing.herokuapp.com/listings/listing-10
+
+ have amenity data
+
+Req:
+    
+
+ featuredListings:[Listing!]!
+
+  -Listing data
+      |
+      amenties
+           id
+            name X
+.....................................................................................
+			Data Loaders
+.....................................................................................
+
+
+
+
+
+
+
+
+
+			

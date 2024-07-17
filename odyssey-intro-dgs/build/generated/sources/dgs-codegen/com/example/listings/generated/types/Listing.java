@@ -6,6 +6,7 @@ import java.lang.Integer;
 import java.lang.Object;
 import java.lang.Override;
 import java.lang.String;
+import java.util.List;
 
 /**
  * A Particular intergalatic location available for booking
@@ -17,6 +18,11 @@ public class Listing {
    * listing tile
    */
   private String title;
+
+  /**
+   * Listing Description
+   */
+  private String description;
 
   /**
    * The number of bed available
@@ -33,16 +39,23 @@ public class Listing {
    */
   private Boolean closedForBookings;
 
+  /**
+   * Amenities feature
+   */
+  private List<Amenity> amenities;
+
   public Listing() {
   }
 
-  public Listing(String id, String title, Integer numOfBeds, Double costPerNight,
-      Boolean closedForBookings) {
+  public Listing(String id, String title, String description, Integer numOfBeds,
+      Double costPerNight, Boolean closedForBookings, List<Amenity> amenities) {
     this.id = id;
     this.title = title;
+    this.description = description;
     this.numOfBeds = numOfBeds;
     this.costPerNight = costPerNight;
     this.closedForBookings = closedForBookings;
+    this.amenities = amenities;
   }
 
   public String getId() {
@@ -62,6 +75,17 @@ public class Listing {
 
   public void setTitle(String title) {
     this.title = title;
+  }
+
+  /**
+   * Listing Description
+   */
+  public String getDescription() {
+    return description;
+  }
+
+  public void setDescription(String description) {
+    this.description = description;
   }
 
   /**
@@ -97,9 +121,20 @@ public class Listing {
     this.closedForBookings = closedForBookings;
   }
 
+  /**
+   * Amenities feature
+   */
+  public List<Amenity> getAmenities() {
+    return amenities;
+  }
+
+  public void setAmenities(List<Amenity> amenities) {
+    this.amenities = amenities;
+  }
+
   @Override
   public String toString() {
-    return "Listing{" + "id='" + id + "'," +"title='" + title + "'," +"numOfBeds='" + numOfBeds + "'," +"costPerNight='" + costPerNight + "'," +"closedForBookings='" + closedForBookings + "'" +"}";
+    return "Listing{" + "id='" + id + "'," +"title='" + title + "'," +"description='" + description + "'," +"numOfBeds='" + numOfBeds + "'," +"costPerNight='" + costPerNight + "'," +"closedForBookings='" + closedForBookings + "'," +"amenities='" + amenities + "'" +"}";
   }
 
   @Override
@@ -109,14 +144,16 @@ public class Listing {
         Listing that = (Listing) o;
         return java.util.Objects.equals(id, that.id) &&
                             java.util.Objects.equals(title, that.title) &&
+                            java.util.Objects.equals(description, that.description) &&
                             java.util.Objects.equals(numOfBeds, that.numOfBeds) &&
                             java.util.Objects.equals(costPerNight, that.costPerNight) &&
-                            java.util.Objects.equals(closedForBookings, that.closedForBookings);
+                            java.util.Objects.equals(closedForBookings, that.closedForBookings) &&
+                            java.util.Objects.equals(amenities, that.amenities);
   }
 
   @Override
   public int hashCode() {
-    return java.util.Objects.hash(id, title, numOfBeds, costPerNight, closedForBookings);
+    return java.util.Objects.hash(id, title, description, numOfBeds, costPerNight, closedForBookings, amenities);
   }
 
   public static com.example.listings.generated.types.Listing.Builder newBuilder() {
@@ -130,6 +167,11 @@ public class Listing {
      * listing tile
      */
     private String title;
+
+    /**
+     * Listing Description
+     */
+    private String description;
 
     /**
      * The number of bed available
@@ -146,13 +188,20 @@ public class Listing {
      */
     private Boolean closedForBookings;
 
+    /**
+     * Amenities feature
+     */
+    private List<Amenity> amenities;
+
     public Listing build() {
                   com.example.listings.generated.types.Listing result = new com.example.listings.generated.types.Listing();
                       result.id = this.id;
           result.title = this.title;
+          result.description = this.description;
           result.numOfBeds = this.numOfBeds;
           result.costPerNight = this.costPerNight;
           result.closedForBookings = this.closedForBookings;
+          result.amenities = this.amenities;
                       return result;
     }
 
@@ -166,6 +215,14 @@ public class Listing {
      */
     public com.example.listings.generated.types.Listing.Builder title(String title) {
       this.title = title;
+      return this;
+    }
+
+    /**
+     * Listing Description
+     */
+    public com.example.listings.generated.types.Listing.Builder description(String description) {
+      this.description = description;
       return this;
     }
 
@@ -191,6 +248,14 @@ public class Listing {
     public com.example.listings.generated.types.Listing.Builder closedForBookings(
         Boolean closedForBookings) {
       this.closedForBookings = closedForBookings;
+      return this;
+    }
+
+    /**
+     * Amenities feature
+     */
+    public com.example.listings.generated.types.Listing.Builder amenities(List<Amenity> amenities) {
+      this.amenities = amenities;
       return this;
     }
   }
