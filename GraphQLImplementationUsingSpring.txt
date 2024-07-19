@@ -1599,6 +1599,337 @@ Two application
  - kotlin
  - router
 
+Defining a federated type
+The Shows DGS defines the Show type with fields id, title and releaseYear. Note that the id field is marked as the key. The example has one key, but you can have multiple keys as well @key(fields:"fieldA fieldB") This indicates to the gateway that the id field will be used for identifying the corresponding Show in the Shows DGS and must be specified for federated types.
+
+type Query {
+  shows(titleFilter: String): [Show]
+}
+
+type Show @key(fields: "id") {
+  id: ID
+  title: String
+  releaseYear: Int
+}
+
+Extending a federated Type
+To extend a type you redefine the type in your own schema, using directive @extends to instruct that it's a type extension. @key is required to indicate the field that the gateway will use to identify the original Show for a query. In this case, the key is the id field.
+....................................................................................				 Security - Auth
+....................................................................................
+
+Graphql dgs frameworks follows spring security, behind the scene
+Spring security:
+
+create project following dependency.
+
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.3.1'
+	id 'io.spring.dependency-management' version '1.1.5'
+	id 'com.netflix.dgs.codegen' version '6.2.1'
+}
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(17)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+ext {
+	set('netflixDgsVersion', "9.0.0")
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'com.netflix.graphql.dgs:graphql-dgs-spring-graphql-starter'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.security:spring-security-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+dependencyManagement {
+	imports {
+		mavenBom "com.netflix.graphql.dgs:graphql-dgs-platform-dependencies:${netflixDgsVersion}"
+	}
+}
+
+generateJava {
+	schemaPaths = ["${projectDir}/src/main/resources/graphql-client"]
+	packageName = 'com.example.dgs_security.codegen'
+	generateClient = true
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
+
+
+create some basic setup:
+
+schema.graphqls
+type Query {
+    hello:String
+}
+
+package com.example.dgs.security.datafetchers;
+
+import com.netflix.graphql.dgs.DgsComponent;
+import com.netflix.graphql.dgs.DgsQuery;
+
+@DgsComponent
+public class HelloWorldDataFetcher {
+
+    @DgsQuery(field = "hello")
+    public String hello(){
+        return  "Hello";
+    }
+}
+
+By default all endpoints are locked up.
+
+after starting the project, you can see password generated in the console -default one
+Using generated security password: b65df2d7-70e2-4927-a4af-fa5d068fbcc7
+
+localhost:8080/graphiql
+
+it will redirect to login page
+
+user Name : user
+password :b65df2d7-70e2-4927-a4af-fa5d068fbcc7
+
+here password may change when ever we start.
+
+
+if you try to run any query in the play ground
+
+http://localhost:8080/graphiql?continue&path=/graphql
+
+{
+  "timestamp": "2024-07-17T02:59:40.518+00:00",
+  "status": 403,
+  "error": "Forbidden",
+  "path": "/graphql"
+}
+
+because spring securies every thing default.
+
+
+Now we need to activate, separate config class.
+
+
+Basic Security config:
+
+package com.example.dgs.security.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.SecurityFilterChain;
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    //create bean: security filter chain
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
+        return httpSecurity
+                .csrf(csr -> csr.disable())
+                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .httpBasic(Customizer.withDefaults())
+                .build();
+
+    }
+}
+
+After this , run the project
+
+in the browser, localhost:8080/graphql
+
+now you will get pop box authentication
+
+give user name and password
+
+ user
+76d3c685-df18-4e1b-b0fd-b7e41d48223f
+
+now you will able to run querys
+
+query MyQuery {
+  hello
+}
+
+{
+  "data": {
+    "hello": "Hello"
+  }
+}
+
+SOme modification:
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
+        return httpSecurity
+                .csrf(csr -> csr.disable())
+                .authorizeHttpRequests(auth -> {
+                            auth.requestMatchers("/graphiql")
+                                    .permitAll()
+                                    .requestMatchers("/graphql").permitAll()
+                                    .anyRequest().permitAll();
+                        }
+                )
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .httpBasic(Customizer.withDefaults())
+                .build();
+
+    }
+}
+........
+
+Users creations with roles: we plan for inmemory users
+
+package com.example.security.config;
+
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.web.SecurityFilterChain;
+
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity(securedEnabled = true)
+public class SecurityConfig {
+
+    //create
+//    @Bean
+//    public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
+//        //configure basic security
+//       return httpSecurity
+//               .csrf(csr -> csr.disable())
+//               //you permit all
+//               .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+//               .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+//               .httpBasic(Customizer.withDefaults())
+//               .build();
+//
+//    }
+//    @Bean
+//    public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
+//        return httpSecurity
+//                .csrf(csr -> csr.disable())
+//                .authorizeHttpRequests(auth -> {
+//                            auth.requestMatchers("/graphiql")
+//                                    .permitAll()
+//                                    .requestMatchers("/graphql").permitAll()
+//                                    .anyRequest().permitAll();
+//                        }
+//                )
+//                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+//                .httpBasic(Customizer.withDefaults())
+//                .build();
+//
+//    }
+
+    @Bean
+    public InMemoryUserDetailsManager users() {
+        UserDetails user = User.withDefaultPasswordEncoder()
+                .username("user")
+                .password("password")
+                .roles("USER")
+                .build();
+
+        UserDetails admin = User.withDefaultPasswordEncoder()
+                .username("admin")
+                .password("password")
+                .roles("USER", "ADMIN")
+                .build();
+
+        return new InMemoryUserDetailsManager(user, admin);
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
+        //configure basic security
+        return httpSecurity
+                .csrf(csr -> csr.disable())
+                //you permit all
+                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .httpBasic(Customizer.withDefaults())
+                .build();
+
+    }
+
+}
+
+Restart server
+
+http://localhost:8080/graphiql
+
+ username : user
+ password  : password
+
+once you authenticated
+
+try to run query
+
+query {
+  hello
+}
+
+Response:
+{
+  "errors": [
+    {
+      "message": "org.springframework.security.authorization.AuthorizationDeniedException: Access Denied",
+      "locations": [
+        {
+          "line": 2,
+          "column": 3
+        }
+      ],
+      "path": [
+        "hello"
+      ],
+      "extensions": {
+        "errorType": "PERMISSION_DENIED"
+      }
+    }
+  ],
+  "data": {
+    "hello": null
+  }
+}
+
+Because as "user" you are not allowed to query data
+
+
+
+
+
+
+
+
+
 
 
 
