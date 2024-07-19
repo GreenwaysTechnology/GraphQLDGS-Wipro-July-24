@@ -1215,13 +1215,16 @@ public class ListingDataFetcher {
     }
 
     @DgsQuery
-    public List<ListingModel> featuredListings() throws IOException {
-        return listingService.featuredListingsRequest();
+    public DataFetcherResult<List<ListingModel>> featuredListings() throws IOException {
+        List<ListingModel> listings = listingService.featuredListingsRequest();
+        return DataFetcherResult.<List<ListingModel>>newResult()
+                .data(listings)
+                .localContext(Map.of("hasAmenityData", false))
+                .build();
     }
 
     @DgsQuery
     public DataFetcherResult<ListingModel> listing(@InputArgument String id) {
-        // return  listingService.listingRequest(id);
         ListingModel listing = listingService.listingRequest(id);
         return DataFetcherResult.<ListingModel>newResult()
                 .data(listing)
@@ -1267,9 +1270,337 @@ Req:
       amenties
            id
             name X
+
+
 .....................................................................................
-			Data Loaders
+			Mutuation
 .....................................................................................
+
+Update schema.graphqls
+
+type Mutation {
+  "Creates a new listing"
+  createListing(input: CreateListingInput!): CreateListingResponse!
+}
+
+input CreateListingInput {
+  "The listing's title"
+  title: String!
+  "The listing's description"
+  description: String!
+  "The number of beds available"
+  numOfBeds: Int!
+  "The cost per night"
+  costPerNight: Float!
+  "Indicates whether listing is closed for bookings (on hiatus)"
+  closedForBookings: Boolean
+  "The Listing's amenities"
+  amenities: [ID!]!
+}
+
+type CreateListingResponse {
+  "Similar to HTTP status code, represents the status of the mutation"
+  code: Int!
+  "Indicates whether the mutation was successful"
+  success: Boolean!
+  "Human-readable message for the UI"
+  message: String!
+  "The newly created listing"
+  listing: Listing
+}
+
+
+Service layer Design:
+package com.example.listings.services;
+
+import com.example.listings.generated.types.Amenity;
+import com.example.listings.generated.types.CreateListingInput;
+import com.example.listings.models.CreatingListingModel;
+import com.example.listings.models.ListingModel;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.http.converter.json.MappingJacksonValue;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+
+import java.io.IOException;
+import java.util.List;
+
+@Component
+public class ListingService {
+    private static final String LISTING_API_URL = "https://rt-airlock-services-listing.herokuapp.com";
+
+    private final RestClient client = RestClient.builder().baseUrl(LISTING_API_URL).build();
+
+
+    private final ObjectMapper mapper = new ObjectMapper();
+
+    //api
+    public List<ListingModel> featuredListingsRequest() throws IOException {
+        JsonNode response = client.get().uri("/featured-listings").retrieve().body(JsonNode.class);
+        if (response != null) {
+            return mapper.readValue(response.traverse(), new TypeReference<List<ListingModel>>() {
+            });
+        }
+        return null;
+    }
+
+    public ListingModel listingRequest(String id) {
+        return client.get()
+                .uri("/listings/{listing_id}", id)
+                .retrieve()
+                .body(ListingModel.class);
+    }
+
+    public List<Amenity> amenitiesRequest(String listingId) throws IOException {
+        //https://rt-airlock-services-listing.herokuapp.com/listings/listing-10/amenities
+        JsonNode response = client.get().uri("/listings/{listing_id}/amenities", listingId)
+                .retrieve()
+                .body(JsonNode.class);
+        if (response != null) {
+            return mapper.readValue(response.traverse(), new TypeReference<List<Amenity>>() {
+            });
+        }
+        return null;
+
+
+    }
+
+    public ListingModel createListingRequest(CreateListingInput listing) {
+        //  new CreatingListingModel(listing);
+        MappingJacksonValue serializedListing = new MappingJacksonValue(new CreatingListingModel(listing));
+        return client
+                .post()
+                .uri("/listings")
+                .body(serializedListing) // TODO!
+                .retrieve()
+                .body(ListingModel.class);
+    }
+
+}
+..........................................................
+
+Data Fetcher
+
+package com.example.listings.datafetchers;
+
+import com.example.listings.generated.types.Amenity;
+import com.example.listings.generated.types.CreateListingInput;
+import com.example.listings.generated.types.CreateListingResponse;
+import com.example.listings.models.ListingModel;
+import com.example.listings.services.ListingService;
+import com.netflix.graphql.dgs.*;
+import graphql.execution.DataFetcherResult;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+
+@DgsComponent
+public class ListingDataFetcher {
+
+    private final ListingService listingService;
+
+    @Autowired
+    public ListingDataFetcher(ListingService listingService) {
+        this.listingService = listingService;
+    }
+
+    @DgsQuery
+    public DataFetcherResult<List<ListingModel>> featuredListings() throws IOException {
+        List<ListingModel> listings = listingService.featuredListingsRequest();
+        return DataFetcherResult.<List<ListingModel>>newResult()
+                .data(listings)
+                .localContext(Map.of("hasAmenityData", false))
+                .build();
+    }
+
+    @DgsQuery
+    public DataFetcherResult<ListingModel> listing(@InputArgument String id) {
+        ListingModel listing = listingService.listingRequest(id);
+        return DataFetcherResult.<ListingModel>newResult()
+                .data(listing)
+                .localContext(Map.of("hasAmenityData", true))
+                .build();
+    }
+
+    //This is data fecther: fetch amenities data from amenties end
+
+    @DgsData(parentType = "Listing")
+    public List<Amenity> amenities(DgsDataFetchingEnvironment dfe) throws IOException {
+        ListingModel listing = dfe.getSource();
+        //getListing id
+        String id = listing.getId();
+        Map<String, Boolean> localContext = dfe.getLocalContext();
+        //when this method called - this is for listing()
+        if (localContext.get("hasAmenityData")) {
+            return listing.getAmenities();
+        }
+        //Follow up
+        //when this method called - featuredListing
+        return listingService.amenitiesRequest(id);
+
+    }
+
+    //Mutation
+    @DgsMutation
+    public CreateListingResponse createListing(@InputArgument CreateListingInput input) {
+        CreateListingResponse response = new CreateListingResponse();
+        try {
+            ListingModel creatingListing = listingService.createListingRequest(input);
+            response.setListing(creatingListing);
+            response.setCode(200);
+            response.setMessage("Success");
+            response.setSuccess(true);
+        } catch (Exception e) {
+            response.setListing(null);
+            response.setCode(500);
+            response.setMessage(e.getMessage());
+            response.setSuccess(false);
+        }
+        return response;
+    }
+}
+
+Testing:
+mutation CreateListing($input: CreateListingInput!) {
+  createListing(input: $input) {
+    code
+    success
+    message
+    listing {
+      title
+      description
+      costPerNight
+   }
+  }
+}
+{
+  "input": {
+    "title": "Mars' top destination",
+    "description": "A really cool place to stay",
+    "costPerNight": 44.0,
+    "closedForBookings":true,
+    "amenities": ["am-1", "am-2"],
+    "numOfBeds": 2
+  }
+}
+.....................................................................................
+			    Data Loader
+....................................................................................
+
+n+1
+  Request
+ For Each listing we can also query for data about each Amenity it has to offer.
+ For Each post we can also query for data about each Comment it has to offer.
+
+ 1-List
+   -Many amenity
+
+ 1-Post
+   -Many Comments
+
+ n- Request - Listing/Post
+  +1      ------->Comment -1
+          ------->Comment -2
+
+The n+1 problem
+
+This is the n+1 problem in action. We start with an initial request (the 1 in the n+1 equation), and this first request determines how many follow-up requests will be necessary (the n in the n+1 equation). The number of required follow-up requests, n, is not known until our first request is executed.
+
+We saw this in action: our first request gave us our featured listings (there were three), but we then needed a follow-up request per listing to get the listing's amenities data.
+
+This doesn't look too bad with just one or two additional requests, but it leads to some troubling situations as our queries scale. Imagine a list contains twenty-five listings ("Top 25 Sub-zero Summer Destinations!"); populating the data for a list like this means we'll send a total of 26 requests! One request to fetch listing data, and 25 additional requests to get the amenity information for each listing!
+
+
+[List ofPost]
+     List of comments 
+
+ Issues:
+   Additional network call
+
+ 1-post
+  10-comments 
+    11 network calls will go.
+
+Issues :
+  Performance issue
+  How to solve this?
+
+ Data Loaders
+.........................
+
+ https://rt-airlock-services-listing.herokuapp.com/featured-listing
+
+    -/listings/{listing_id}/amenities 
+
+ /amenities/listings?listingId=1&&
+
+.....................................................................................
+			 Federation
+.....................................................................................
+
+Microservices based graphql implementation.
+
+
+Mononlithic- single graphql 
+
+Flow
+ Client-----request-------------------->GraphqlServer---runs code and returns reponse
+
+How to implement federation?
+
+  Federation is a infrastructure feature not provide by "java/spring/dgs" expect "js/ts"
+   Apollo is company who is providing federation infrastructure.
+
+Federation implemenation:
+
+1.Using cloud services - ApolloGraph OS
+2.Using coding - ApolloGraphql server which is written in node.js
+
+
+Client--------------ApplloGraphql(node.js)--------->Super Graph
+
+In order to implement Federation  we have directives.
+Directives are just functions.
+
+Federation directives
+
+@Key
+@external
+@extends
+@provides
+@requires
+
+@key:
+
+ This directives takes on field arugment inside it, the @key field.
+
+ type Post @key(fields:"id"){
+  id:ID!
+  title:String
+ }
+
+@extends directive
+ This directie provides support for extended definitions.
+
+ type Post @key(fields:"id") @extends {
+  id:String @id @external
+  title:String
+ }
+
+implementation:
+
+Two application
+
+ - java
+ - kotlin
+ - router
+
+
+
 
 
 
